@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 
 # ---------------------------------------------------------
 # PAGE CONFIGURATION
@@ -157,11 +158,263 @@ SKILL_RECOMMENDATIONS = {
     }
 }
 
-# ---------------------------------------------------------
-# PAGE TITLE
-# ---------------------------------------------------------
 
-st.title("🎯 Personalized Career & Skill Navigator Agent")
+# =========================================================
+# AI AGENT FUNCTION
+# =========================================================
+
+def generate_ai_personalization(
+    name,
+    education,
+    current_skills,
+    target_career,
+    matched_skills,
+    missing_skills,
+    completed_skills,
+    remaining_skills,
+    progress_percentage
+):
+    """
+    AI Career Agent.
+
+    The function uses an LLM when an API key is configured.
+    If the API is unavailable, it automatically uses a
+    deterministic fallback so the application still works.
+    """
+
+    # -----------------------------------------------------
+    # TRY TO GET API KEY
+    # -----------------------------------------------------
+
+    api_key = None
+
+    try:
+        api_key = st.secrets.get("OPENAI_API_KEY")
+    except Exception:
+        api_key = os.getenv("OPENAI_API_KEY")
+
+    # -----------------------------------------------------
+    # FALLBACK FUNCTION
+    # -----------------------------------------------------
+
+    def fallback_response():
+
+        if remaining_skills:
+
+            priority = remaining_skills[0]
+
+            roadmap_text = ""
+
+            for index, skill in enumerate(
+                remaining_skills,
+                start=1
+            ):
+
+                recommendation = SKILL_RECOMMENDATIONS.get(
+                    skill,
+                    {
+                        "learn": f"Learn {skill} fundamentals",
+                        "practice": f"Practice {skill} with exercises",
+                        "project": f"Build a project using {skill}"
+                    }
+                )
+
+                roadmap_text += (
+                    f"\n{index}. {skill}"
+                    f"\n   Learn: {recommendation['learn']}"
+                    f"\n   Practice: {recommendation['practice']}"
+                    f"\n   Project: {recommendation['project']}\n"
+                )
+
+            return {
+                "analysis": (
+                    f"{name} is currently at "
+                    f"{progress_percentage:.0f}% progress toward the "
+                    f"{target_career} skill profile. "
+                    f"The current skill gaps indicate that "
+                    f"{priority} should be prioritized next."
+                ),
+
+                "priority": priority,
+
+                "roadmap": roadmap_text,
+
+                "projects": [
+                    SKILL_RECOMMENDATIONS.get(
+                        skill,
+                        {
+                            "project":
+                            f"Build a project using {skill}"
+                        }
+                    ).get(
+                        "project",
+                        f"Build a project using {skill}"
+                    )
+                    for skill in remaining_skills[:3]
+                ],
+
+                "adaptation": (
+                    "The roadmap will automatically change as "
+                    "you complete skills. Completed skills are "
+                    "removed from the active learning path and "
+                    "the next remaining skill becomes the new "
+                    "priority."
+                )
+            }
+
+        else:
+
+            return {
+                "analysis": (
+                    f"Congratulations {name}! You have completed "
+                    f"the currently required skills for "
+                    f"{target_career}."
+                ),
+
+                "priority": "Advanced Projects",
+
+                "roadmap": (
+                    "\n1. Build advanced projects"
+                    "\n2. Create a strong GitHub portfolio"
+                    "\n3. Practice real-world problems"
+                    "\n4. Prepare for interviews"
+                ),
+
+                "projects": [
+                    "Build an end-to-end portfolio project",
+                    "Contribute to an open-source project",
+                    "Create a real-world AI application"
+                ],
+
+                "adaptation": (
+                    "Since the required skills are completed, "
+                    "the roadmap shifts from skill acquisition "
+                    "toward advanced projects, portfolio "
+                    "development and career preparation."
+                )
+            }
+
+    # -----------------------------------------------------
+    # IF NO API KEY
+    # -----------------------------------------------------
+
+    if not api_key:
+        return fallback_response()
+
+    # -----------------------------------------------------
+    # TRY OPENAI
+    # -----------------------------------------------------
+
+    try:
+
+        from openai import OpenAI
+
+        client = OpenAI(
+            api_key=api_key
+        )
+
+        prompt = f"""
+You are an AI Career and Skill Navigator Agent.
+
+Your job is to create a personalized career roadmap
+for a student.
+
+STUDENT PROFILE
+Name: {name}
+Education: {education}
+Current Skills: {current_skills}
+
+TARGET CAREER
+{target_career}
+
+SKILL ANALYSIS
+Matching Skills: {", ".join(matched_skills)}
+Missing Skills: {", ".join(missing_skills)}
+
+PROGRESS
+Completed Skills: {", ".join(completed_skills)}
+Remaining Skills: {", ".join(remaining_skills)}
+
+Current Progress:
+{progress_percentage:.0f}%
+
+Create a practical and personalized career plan.
+
+Return exactly these sections:
+
+1. CAREER ANALYSIS
+Explain the student's current position.
+
+2. NEXT PRIORITY
+Choose the most important remaining skill.
+
+3. PERSONALIZED ROADMAP
+Give a logical learning order.
+
+4. PROJECT RECOMMENDATIONS
+Recommend practical projects.
+
+5. ADAPTIVE STRATEGY
+Explain how the roadmap should change
+when the student completes skills.
+
+6. CAREER ADVICE
+Give practical next steps.
+
+Keep the answer concise and suitable for
+a student dashboard.
+
+Do not invent certificates, courses,
+companies or statistics.
+"""
+
+        response = client.responses.create(
+            model="gpt-5-mini",
+            input=prompt
+        )
+
+        ai_text = response.output_text
+
+        return {
+            "analysis": ai_text,
+            "priority": (
+                remaining_skills[0]
+                if remaining_skills
+                else "Advanced Projects"
+            ),
+            "roadmap": "",
+            "projects": [],
+            "adaptation": (
+                "The AI agent generated this roadmap using "
+                "the student's current profile, skill gaps "
+                "and progress."
+            )
+        }
+
+    except Exception as e:
+
+        # -------------------------------------------------
+        # SAFE FALLBACK
+        # -------------------------------------------------
+
+        fallback = fallback_response()
+
+        fallback["analysis"] += (
+            "\n\nAI service is temporarily unavailable, "
+            "so the system is using its built-in career "
+            "recommendation engine."
+        )
+
+        return fallback
+
+
+# =========================================================
+# PAGE TITLE
+# =========================================================
+
+st.title(
+    "🎯 Personalized Career & Skill Navigator Agent"
+)
 
 st.write(
     "AI-powered personalized career and skill roadmap navigator"
@@ -169,9 +422,10 @@ st.write(
 
 st.divider()
 
-# ---------------------------------------------------------
+
+# =========================================================
 # STUDENT PROFILE
-# ---------------------------------------------------------
+# =========================================================
 
 st.header("👤 Student Profile")
 
@@ -195,9 +449,10 @@ career = st.selectbox(
     list(CAREER_SKILLS.keys())
 )
 
-# ---------------------------------------------------------
+
+# =========================================================
 # ANALYZE BUTTON
-# ---------------------------------------------------------
+# =========================================================
 
 if st.button(
     "🚀 Analyze My Career",
@@ -206,17 +461,21 @@ if st.button(
 
     if not name:
 
-        st.warning("Please enter your name.")
+        st.warning(
+            "Please enter your name."
+        )
 
     elif not skills_input:
 
-        st.warning("Please enter your current skills.")
+        st.warning(
+            "Please enter your current skills."
+        )
 
     else:
 
-        # -------------------------------------------------
+        # =================================================
         # CONVERT USER SKILLS
-        # -------------------------------------------------
+        # =================================================
 
         user_skills = [
             skill.strip().lower()
@@ -224,15 +483,17 @@ if st.button(
             if skill.strip()
         ]
 
-        # -------------------------------------------------
+
+        # =================================================
         # REQUIRED SKILLS
-        # -------------------------------------------------
+        # =================================================
 
         required_skills = CAREER_SKILLS[career]
 
-        # -------------------------------------------------
+
+        # =================================================
         # SKILL GAP ANALYSIS
-        # -------------------------------------------------
+        # =================================================
 
         matched_skills = []
 
@@ -248,23 +509,30 @@ if st.button(
 
                 missing_skills.append(skill)
 
-        # -------------------------------------------------
-        # CAREER MATCH
-        # -------------------------------------------------
 
-        total_required = len(required_skills)
+        # =================================================
+        # CAREER MATCH
+        # =================================================
+
+        total_required = len(
+            required_skills
+        )
 
         match_percentage = (
-            len(matched_skills) / total_required
+            len(matched_skills)
+            / total_required
         ) * 100
 
-        # -------------------------------------------------
+
+        # =================================================
         # CAREER ANALYSIS
-        # -------------------------------------------------
+        # =================================================
 
         st.divider()
 
-        st.header("📊 Career Analysis")
+        st.header(
+            "📊 Career Analysis"
+        )
 
         st.success(
             f"Hello {name}! "
@@ -276,11 +544,14 @@ if st.button(
             f"{match_percentage:.0f}%"
         )
 
-        # -------------------------------------------------
-        # MATCHING SKILLS
-        # -------------------------------------------------
 
-        st.subheader("✅ Your Matching Skills")
+        # =================================================
+        # MATCHING SKILLS
+        # =================================================
+
+        st.subheader(
+            "✅ Your Matching Skills"
+        )
 
         if matched_skills:
 
@@ -296,11 +567,14 @@ if st.button(
                 "No matching skills found yet."
             )
 
-        # -------------------------------------------------
-        # SKILL GAPS
-        # -------------------------------------------------
 
-        st.subheader("❌ Your Skill Gaps")
+        # =================================================
+        # SKILL GAPS
+        # =================================================
+
+        st.subheader(
+            "❌ Your Skill Gaps"
+        )
 
         if missing_skills:
 
@@ -316,9 +590,10 @@ if st.button(
                 "Excellent! You have all the required skills."
             )
 
-        # -------------------------------------------------
+
+        # =================================================
         # REQUIRED SKILLS
-        # -------------------------------------------------
+        # =================================================
 
         st.subheader(
             "🎯 Skills Required for Your Career"
@@ -330,9 +605,10 @@ if st.button(
                 f"• {skill}"
             )
 
-        # -------------------------------------------------
+
+        # =================================================
         # PROGRESS TRACKING
-        # -------------------------------------------------
+        # =================================================
 
         st.divider()
 
@@ -347,13 +623,13 @@ if st.button(
 
         completed_skills = []
 
-        # -------------------------------------------------
+
+        # =================================================
         # SKILL CHECKBOXES
-        # -------------------------------------------------
+        # =================================================
 
         for skill in required_skills:
 
-            # Existing skills are automatically completed
             default_value = (
                 skill in matched_skills
             )
@@ -366,11 +642,14 @@ if st.button(
 
             if completed:
 
-                completed_skills.append(skill)
+                completed_skills.append(
+                    skill
+                )
 
-        # -------------------------------------------------
+
+        # =================================================
         # OVERALL PROGRESS
-        # -------------------------------------------------
+        # =================================================
 
         completed_count = len(
             completed_skills
@@ -381,8 +660,10 @@ if st.button(
         )
 
         progress_percentage = (
-            completed_count / total_skills
+            completed_count
+            / total_skills
         ) * 100
+
 
         st.subheader(
             "🎯 Overall Career Progress"
@@ -402,9 +683,10 @@ if st.button(
             f"{total_skills} skills completed**"
         )
 
-        # -------------------------------------------------
+
+        # =================================================
         # SKILL STATUS
-        # -------------------------------------------------
+        # =================================================
 
         st.subheader(
             "📋 Skill Status"
@@ -424,9 +706,10 @@ if st.button(
                     f"⬜ **{skill}** — Not Completed"
                 )
 
-        # -------------------------------------------------
+
+        # =================================================
         # ADAPTIVE ROADMAP
-        # -------------------------------------------------
+        # =================================================
 
         st.divider()
 
@@ -434,20 +717,19 @@ if st.button(
             "🗺️ Adaptive Learning Roadmap"
         )
 
-        # Find incomplete skills
         remaining_skills = [
             skill
             for skill in required_skills
             if skill not in completed_skills
         ]
 
-        # -------------------------------------------------
+
+        # =================================================
         # ADAPTIVE RECOMMENDATION
-        # -------------------------------------------------
+        # =================================================
 
         if remaining_skills:
 
-            # First incomplete skill is the next priority
             next_skill = remaining_skills[0]
 
             st.info(
@@ -493,10 +775,11 @@ if st.button(
                 "projects and prepare for industry roles."
             )
 
-        # -------------------------------------------------
+
+        # =================================================
         # STEP 3
         # PERSONALIZED SKILL RECOMMENDATIONS
-        # -------------------------------------------------
+        # =================================================
 
         st.divider()
 
@@ -512,7 +795,6 @@ if st.button(
                 "recommendations:"
             )
 
-            # Show recommendations only for missing skills
             for skill in remaining_skills:
 
                 if skill in SKILL_RECOMMENDATIONS:
@@ -561,9 +843,203 @@ if st.button(
                 "Start building advanced projects!"
             )
 
-        # -------------------------------------------------
+
+        # =================================================
+        # STEP 4
+        # AI PERSONALIZATION
+        # =================================================
+
+        st.divider()
+
+        st.header(
+            "🤖 AI Career Personalization Agent"
+        )
+
+        st.write(
+            "The AI agent analyzes your profile, "
+            "career goal, skill gaps and progress "
+            "to generate a personalized roadmap."
+        )
+
+
+        # =================================================
+        # AI GENERATION BUTTON
+        # =================================================
+
+        if st.button(
+            "✨ Generate My AI Career Roadmap",
+            use_container_width=True
+        ):
+
+            with st.spinner(
+                "🤖 AI Agent is analyzing your career profile..."
+            ):
+
+                ai_result = generate_ai_personalization(
+                    name=name,
+                    education=education,
+                    current_skills=skills_input,
+                    target_career=career,
+                    matched_skills=matched_skills,
+                    missing_skills=missing_skills,
+                    completed_skills=completed_skills,
+                    remaining_skills=remaining_skills,
+                    progress_percentage=progress_percentage
+                )
+
+
+            # =================================================
+            # AI CAREER ANALYSIS
+            # =================================================
+
+            st.success(
+                "🤖 AI Career Analysis Generated"
+            )
+
+            st.subheader(
+                "🧠 Personalized Career Analysis"
+            )
+
+            st.write(
+                ai_result["analysis"]
+            )
+
+
+            # =================================================
+            # AI NEXT PRIORITY
+            # =================================================
+
+            st.subheader(
+                "🎯 AI Recommended Next Priority"
+            )
+
+            st.info(
+                f"Focus next on: "
+                f"**{ai_result['priority']}**"
+            )
+
+
+            # =================================================
+            # AI ROADMAP
+            # =================================================
+
+            if ai_result["roadmap"]:
+
+                st.subheader(
+                    "🗺️ AI Personalized Roadmap"
+                )
+
+                st.write(
+                    ai_result["roadmap"]
+                )
+
+
+            # =================================================
+            # AI PROJECTS
+            # =================================================
+
+            if ai_result["projects"]:
+
+                st.subheader(
+                    "💻 AI Recommended Projects"
+                )
+
+                for project in ai_result["projects"]:
+
+                    st.write(
+                        f"🚀 {project}"
+                    )
+
+
+            # =================================================
+            # AI ADAPTATION
+            # =================================================
+
+            st.subheader(
+                "🔄 Adaptive AI Strategy"
+            )
+
+            st.write(
+                ai_result["adaptation"]
+            )
+
+
+            # =================================================
+            # AGENT PIPELINE VISUALIZATION
+            # =================================================
+
+            st.divider()
+
+            st.subheader(
+                "🔗 Agentic AI Decision Pipeline"
+            )
+
+            st.write(
+                "👤 Student Profile"
+            )
+
+            st.write(
+                "↓"
+            )
+
+            st.write(
+                "🎯 Career Goal"
+            )
+
+            st.write(
+                "↓"
+            )
+
+            st.write(
+                "📊 Skill Gap Analysis"
+            )
+
+            st.write(
+                "↓"
+            )
+
+            st.write(
+                "🤖 AI Career Agent"
+            )
+
+            st.write(
+                "↓"
+            )
+
+            st.write(
+                "🗺️ Personalized Roadmap"
+            )
+
+            st.write(
+                "↓"
+            )
+
+            st.write(
+                "📚 Recommendations"
+            )
+
+            st.write(
+                "↓"
+            )
+
+            st.write(
+                "📈 Progress Tracking"
+            )
+
+            st.write(
+                "↓"
+            )
+
+            st.write(
+                "🔄 Adaptive Roadmap"
+            )
+
+
+        # =================================================
         # RECOMMENDED NEXT ACTIONS
-        # -------------------------------------------------
+        # =================================================
+
+        st.divider()
 
         st.header(
             "💡 Recommended Next Actions"
@@ -613,9 +1089,10 @@ if st.button(
                 "🏆 Consider relevant certifications."
             )
 
-        # -------------------------------------------------
+
+        # =================================================
         # EXPLANATION
-        # -------------------------------------------------
+        # =================================================
 
         st.subheader(
             "💡 Why these recommendations?"
