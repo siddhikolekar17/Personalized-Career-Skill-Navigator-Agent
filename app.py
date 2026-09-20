@@ -149,7 +149,7 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
         ) * 100
 
         # -------------------------------------------------
-        # RESULTS
+        # CAREER ANALYSIS
         # -------------------------------------------------
 
         st.divider()
@@ -177,6 +177,7 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
                 st.write(f"✅ {skill}")
 
         else:
+
             st.write("No matching skills found yet.")
 
         # -------------------------------------------------
@@ -223,13 +224,13 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
         # Create checkbox for every required skill
         for skill in required_skills:
 
-            # Already matching skills are automatically completed
+            # Current skills are automatically marked complete
             default_value = skill in matched_skills
 
             completed = st.checkbox(
                 skill,
                 value=default_value,
-                key=f"progress_{skill}"
+                key=f"progress_{career}_{skill}"
             )
 
             if completed:
@@ -272,72 +273,84 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
 
             if skill in completed_skills:
 
-                st.write(f"✅ **{skill}** — Completed")
+                st.write(
+                    f"✅ **{skill}** — Completed"
+                )
 
             else:
 
-                st.write(f"⬜ **{skill}** — Not Completed")
+                st.write(
+                    f"⬜ **{skill}** — Not Completed"
+                )
 
         # -------------------------------------------------
-# ADAPTIVE ROADMAP
-# -------------------------------------------------
+        # ADAPTIVE ROADMAP
+        # -------------------------------------------------
 
-st.subheader("🗺️ Adaptive Learning Roadmap")
+        st.divider()
 
-# Skills that are still incomplete
-remaining_skills = [
-    skill
-    for skill in required_skills
-    if skill not in completed_skills
-]
+        st.subheader("🗺️ Adaptive Learning Roadmap")
 
-if remaining_skills:
+        # Find skills that are still incomplete
+        remaining_skills = [
+            skill
+            for skill in required_skills
+            if skill not in completed_skills
+        ]
 
-    # The first incomplete skill becomes the next priority
-    next_skill = remaining_skills[0]
+        # -------------------------------------------------
+        # ADAPTIVE RECOMMENDATION
+        # -------------------------------------------------
 
-    st.info(
-        f"🤖 **Agent Recommendation:** "
-        f"Your next priority should be **{next_skill}**."
-    )
+        if remaining_skills:
 
-    st.write(
-        "The roadmap automatically adapts based on your "
-        "completed skills."
-    )
+            # First incomplete skill becomes next priority
+            next_skill = remaining_skills[0]
 
-    st.divider()
-
-    # Show adaptive roadmap
-    for index, skill in enumerate(
-        remaining_skills,
-        start=1
-    ):
-
-        if index == 1:
+            st.info(
+                f"🤖 **Agent Recommendation:** "
+                f"Your next priority should be **{next_skill}**."
+            )
 
             st.write(
-                f"🔥 **NEXT:** {skill}"
+                "The roadmap automatically adapts based on "
+                "your completed skills."
             )
+
+            # -------------------------------------------------
+            # UPDATED ROADMAP
+            # -------------------------------------------------
+
+            st.write("### 📚 Updated Roadmap")
+
+            for index, skill in enumerate(
+                remaining_skills,
+                start=1
+            ):
+
+                if index == 1:
+
+                    st.write(
+                        f"🔥 **NEXT:** {skill}"
+                    )
+
+                else:
+
+                    st.write(
+                        f"➡️ **Step {index}:** {skill}"
+                    )
 
         else:
 
-            st.write(
-                f"➡️ **Step {index}:** {skill}"
+            st.success(
+                "🎉 You have completed all required skills!"
             )
 
-else:
+            st.write(
+                "Your next step is to build advanced projects "
+                "and prepare for industry roles."
+            )
 
-    st.success(
-    f"🎯 Because you completed previous skills, "
-    f"the agent has updated your roadmap. "
-    f"Your next recommended skill is **{next_skill}**."
-)
-
-    st.write(
-        "Your next step is to build advanced projects "
-        "and prepare for industry roles."
-    )
         # -------------------------------------------------
         # RECOMMENDED NEXT ACTIONS
         # -------------------------------------------------
@@ -346,6 +359,7 @@ else:
 
         if remaining_skills:
 
+            # The first remaining skill is the priority
             next_skill = remaining_skills[0]
 
             st.write(
