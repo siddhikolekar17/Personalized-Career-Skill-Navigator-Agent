@@ -112,3 +112,14 @@ cd Personalized-Career-Skill-Navigator-Agent
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
+```
+## Module Responsibilities
+
+The project is organized into separate modules so that career analysis, recommendations, roadmap generation, data persistence, and the Streamlit interface remain easy to maintain.
+
+- **Career engine** — compares the user's current skills with the requirements of the selected target role.
+- **Roadmap** — organizes identified skill gaps into a personalized learning plan.
+- **Recommendations** — provides relevant learning resources, projects, certifications, and activities.
+- **Database** — manages persistent user profile and progress data.
+- **UI components** — presents the profile, career analysis, roadmap, and progress information in Streamlit.
+- **Tests** — verifies important application behavior and core modules.
