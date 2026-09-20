@@ -1,8 +1,6 @@
 # Personalized Career & Skill Navigator Agent
 
-An adaptive career-guidance app. It builds a structured profile, compares the user's skills with a target role,
-ranks the skill gaps, generates a phased learning roadmap and **re-plans every time the user makes progress or the
-role's requirements change**. Every recommendation comes with a plain-language explanation.
+An adaptive career-guidance app. It builds a structured profile, compares the user's skills with a target role, ranks the skill gaps, generates a phased learning roadmap and **re-plans every time the user makes progress or the role's requirements change**. Every recommendation comes with a plain-language explanation.
 
 Built for the DSSA 24-Hour Hackathon (Problem 02).
 
@@ -33,28 +31,57 @@ Built for the DSSA 24-Hour Hackathon (Problem 02).
 
 ## Run it
 
+### 1. Create a virtual environment
+
 ```bash
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt
+```
+
+### 2. Activate the virtual environment
+
+**Windows:**
+
+```bash
+.venv\Scripts\activate
+```
+
+**Linux/macOS:**
+
+```bash
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Run the application
+
+```bash
 streamlit run app.py
 ```
+
+The application will open in your browser.
 
 Click **Try the demo profile** in the sidebar for an instant walkthrough.
 
 ## Test it
 
+Run the automated tests with:
+
 ```bash
 pytest -q
 ```
 
-Covers the knowledge base, gap engine, roadmap ordering and scheduling, adaptivity, SQLite round trips and an end-to-end
-UI flow (Streamlit `AppTest`).
+The tests cover the knowledge base, gap engine, roadmap ordering and scheduling, adaptivity, SQLite round trips and an end-to-end UI flow using Streamlit `AppTest`.
 
 ## Project structure
 
-```
+```text
 app.py                     Streamlit entry point and navigation
+
 backend/
   data.py                  Skills, resources, careers, market presets
   career_engine.py         Requirements, gaps, priorities, match, explanations
@@ -62,18 +89,21 @@ backend/
   roadmap.py               Phased schedule, adaptive notes, Markdown export
   analysis.py              Facade: one call runs the whole pipeline
   database.py              SQLite persistence
+
 ui/
   components.py            CSS and reusable widgets
   profile.py               Profile and goal form
-  dashboard.py             Overview, gaps, roadmap, recommendations, adaptive engine, progress
-tests/                     pytest suite
+  dashboard.py             Overview, gaps, roadmap, recommendations,
+                           adaptive engine, progress
+
+tests/                     pytest test suite
 ```
 
 ## Suggested demo flow (3 minutes)
 
-1. Sidebar: **Try the demo profile**. Show the hero sign and the career-match strip.
+1. Sidebar: **Try the demo profile**. Show the hero section and career-match strip.
 2. **Skill gaps**: open the top gap and read its explanation.
-3. **Roadmap**: mark two steps complete and watch match, hours and the roadmap change.
+3. **Roadmap**: mark two steps complete and watch the match, hours and roadmap change.
 4. **Adaptive engine**: apply the example requirement change and show priorities re-ranking.
 5. **Progress**: show the match-over-time chart and download the roadmap.
 
@@ -83,20 +113,51 @@ tests/                     pytest suite
 * Example "market updates" are simulated to demonstrate adaptability; they are not live job-market data.
 * Possible extension: plug an LLM behind `explain_*` for richer coaching, or replace `data.py` with a live skills API.
 
-## System Workflow
+## Installation and Setup
 
-User Profile
-↓
-Target Career Selection
-↓
-Current Skill Analysis
-↓
-Skill Gap Identification
-↓
-Personalized Roadmap
-↓
-Learning Recommendations
-↓
-Progress Tracking
-↓
-Adaptive Re-planning
+### Prerequisites
+
+Make sure the following are installed:
+
+- Python 3.10 or later
+- Git
+- A web browser
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/siddhikolekar17/Personalized-Career-Skill-Navigator-Agent.git
+cd Personalized-Career-Skill-Navigator-Agent
+```
+
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Run the Project
+
+```bash
+streamlit run app.py
+```
+
+The application will open in your browser.
+
+### Run Tests
+
+```bash
+pytest -q
+```
+
+## Live Demo
+
+**Streamlit Application:**
+
+https://personalized-career-skill-navigator-agent-epsjyrwxpdkxb2xyzaoh.streamlit.app/
+
+## Source Code
+
+**GitHub Repository:**
+
+https://github.com/siddhikolekar17/Personalized-Career-Skill-Navigator-Agent
