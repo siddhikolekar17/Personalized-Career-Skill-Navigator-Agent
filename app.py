@@ -119,6 +119,32 @@ st.markdown(
         border: 1px solid #dce3ec;
         margin-bottom: 10px;
     }
+
+    .dashboard-card {
+        padding: 20px;
+        border-radius: 15px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        text-align: center;
+        min-height: 125px;
+    }
+
+    .dashboard-number {
+        font-size: 32px;
+        font-weight: bold;
+        margin-top: 8px;
+    }
+
+    .dashboard-label {
+        color: #64748b;
+        font-size: 14px;
+    }
+
+    .dashboard-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -817,7 +843,6 @@ if st.button(
 
     else:
 
-        # Generate fresh analysis
         st.session_state.analysis_data = generate_analysis(
             name=name.strip(),
             career=career,
@@ -871,82 +896,66 @@ if (
     )
 
     # ========================================================
-    # METRICS
+    # TOP CAREER METRICS
     # ========================================================
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-
         st.markdown(
             f"""
             <div class="metric-card">
-
                 <div class="metric-value">
                     {data["percentage"]}%
                 </div>
-
                 <div class="metric-label">
                     Career Match
                 </div>
-
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col2:
-
         st.markdown(
             f"""
             <div class="metric-card">
-
                 <div class="metric-value">
                     {len(data["matching"])}
                 </div>
-
                 <div class="metric-label">
                     Matching Skills
                 </div>
-
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col3:
-
         st.markdown(
             f"""
             <div class="metric-card">
-
                 <div class="metric-value">
                     {len(data["missing"])}
                 </div>
-
                 <div class="metric-label">
                     Skill Gaps
                 </div>
-
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col4:
-
         st.markdown(
             f"""
             <div class="metric-card">
-
                 <div class="metric-value">
                     {len(data["required"])}
                 </div>
-
                 <div class="metric-label">
                     Required Skills
                 </div>
-
             </div>
             """,
             unsafe_allow_html=True,
@@ -1192,21 +1201,15 @@ if (
 
     for skill in progress_skills:
 
-        # Initially selected skills are completed.
         default_value = (
             skill in data["matching"]
         )
 
-        key = (
-            f"progress_{skill}_{data['career']}"
-        )
+        key = f"progress_{skill}_{data['career']}"
 
-        # Initialize only once.
         if key not in st.session_state:
 
-            st.session_state[key] = (
-                default_value
-            )
+            st.session_state[key] = default_value
 
         completed = st.checkbox(
             skill,
@@ -1216,7 +1219,10 @@ if (
         if completed:
             completed_count += 1
 
-    # Calculate progress.
+    # ========================================================
+    # REAL LEARNING PROGRESS
+    # ========================================================
+
     progress = (
         round(
             (
@@ -1230,10 +1236,7 @@ if (
 
     st.progress(
         progress / 100,
-        text=(
-            f"Learning Progress: "
-            f"{progress}%"
-        ),
+        text=f"Learning Progress: {progress}%",
     )
 
     st.write(
@@ -1269,6 +1272,220 @@ if (
         )
 
     # ========================================================
+    # STEP 5 — DASHBOARD
+    # ========================================================
+
+    st.divider()
+
+    st.header("📊 Career Dashboard")
+
+    st.caption(
+        "Live dashboard based on your current career analysis "
+        "and skill completion progress."
+    )
+
+    # --------------------------------------------------------
+    # Dashboard Metrics
+    # --------------------------------------------------------
+
+    dashboard_col1, dashboard_col2, dashboard_col3, dashboard_col4 = (
+        st.columns(4)
+    )
+
+    with dashboard_col1:
+
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+
+                <div class="dashboard-label">
+                    Career Match
+                </div>
+
+                <div class="dashboard-number">
+                    {data["percentage"]}%
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with dashboard_col2:
+
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+
+                <div class="dashboard-label">
+                    Skills Completed
+                </div>
+
+                <div class="dashboard-number">
+                    {completed_count}/{len(progress_skills)}
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with dashboard_col3:
+
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+
+                <div class="dashboard-label">
+                    Skills Remaining
+                </div>
+
+                <div class="dashboard-number">
+                    {len(progress_skills) - completed_count}
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with dashboard_col4:
+
+        st.markdown(
+            f"""
+            <div class="dashboard-card">
+
+                <div class="dashboard-label">
+                    Roadmap Progress
+                </div>
+
+                <div class="dashboard-number">
+                    {progress}%
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # --------------------------------------------------------
+    # Skill Completion Chart
+    # --------------------------------------------------------
+
+    st.subheader("📈 Skill Completion Overview")
+
+    chart_data = {
+        "Completed": completed_count,
+        "Remaining": len(progress_skills) - completed_count,
+    }
+
+    st.bar_chart(
+        chart_data,
+        height=300,
+    )
+
+    # --------------------------------------------------------
+    # Roadmap Progress
+    # --------------------------------------------------------
+
+    st.subheader("🗺️ Roadmap Progress")
+
+    st.progress(
+        progress / 100,
+        text=f"Roadmap Progress: {progress}%",
+    )
+
+    if progress == 100:
+
+        st.success(
+            "🎉 All required skills are completed! "
+            "You can now focus on advanced projects, "
+            "specialization and career preparation."
+        )
+
+    elif progress >= 75:
+
+        st.info(
+            "🚀 You are close to completing the roadmap. "
+            "Focus on the remaining skills and portfolio projects."
+        )
+
+    elif progress >= 50:
+
+        st.info(
+            "📚 More than half of the required skills are complete. "
+            "Continue with intermediate learning and projects."
+        )
+
+    else:
+
+        st.warning(
+            "🌱 Keep building your foundation. "
+            "Complete the next prioritized skill to move forward."
+        )
+
+    # --------------------------------------------------------
+    # Dashboard Skill Status
+    # --------------------------------------------------------
+
+    st.subheader("📋 Skill Status")
+
+    dashboard_status_col1, dashboard_status_col2 = st.columns(2)
+
+    with dashboard_status_col1:
+
+        st.markdown("### ✅ Completed Skills")
+
+        if data["matching"]:
+
+            for skill in data["required"]:
+
+                key = f"progress_{skill}_{data['career']}"
+
+                if st.session_state.get(key, False):
+
+                    st.success(
+                        f"✓ {skill}"
+                    )
+
+        else:
+
+            st.write("No skills completed yet.")
+
+    with dashboard_status_col2:
+
+        st.markdown("### ⏳ Remaining Skills")
+
+        remaining_dashboard_skills = []
+
+        for skill in data["required"]:
+
+            key = f"progress_{skill}_{data['career']}"
+
+            if not st.session_state.get(
+                key,
+                False,
+            ):
+
+                remaining_dashboard_skills.append(
+                    skill
+                )
+
+        if remaining_dashboard_skills:
+
+            for skill in remaining_dashboard_skills:
+
+                st.warning(
+                    f"• {skill}"
+                )
+
+        else:
+
+            st.success(
+                "No remaining skills."
+            )
+
+    # ========================================================
     # RESET PROGRESS
     # ========================================================
 
@@ -1279,9 +1496,7 @@ if (
 
         for skill in data["required"]:
 
-            key = (
-                f"progress_{skill}_{data['career']}"
-            )
+            key = f"progress_{skill}_{data['career']}"
 
             if key in st.session_state:
 
@@ -1481,8 +1696,8 @@ if (
     )
 
     st.caption(
-        "Analysis generated locally on "
-        f"{datetime.now().strftime('%d %b %Y, %H:%M')}"
+        "Analysis generated locally • "
+        "Real-time profile evaluation"
     )
 
 # ============================================================
