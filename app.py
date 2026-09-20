@@ -1,5 +1,6 @@
 import streamlit as st
-from datetime import datetime
+import sqlite3
+from pathlib import Path
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -13,12 +14,140 @@ st.set_page_config(
 )
 
 # ============================================================
+# DATABASE CONFIGURATION — STEP 6
+# ============================================================
+
+DB_FILE = Path("career_navigator.db")
+
+
+def get_db_connection():
+    """Create a connection to the SQLite database."""
+    return sqlite3.connect(DB_FILE)
+
+
+def initialize_database():
+    """Create the progress table if it does not already exist."""
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS skill_progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_name TEXT NOT NULL,
+            career TEXT NOT NULL,
+            skill TEXT NOT NULL,
+            completed INTEGER NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(student_name, career, skill)
+        )
+        """
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def save_progress(student_name, career, progress_data):
+    """Save the student's current skill progress."""
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    for skill, completed in progress_data.items():
+
+        cursor.execute(
+            """
+            INSERT INTO skill_progress
+            (
+                student_name,
+                career,
+                skill,
+                completed,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+
+            ON CONFLICT(student_name, career, skill)
+            DO UPDATE SET
+                completed = excluded.completed,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                student_name,
+                career,
+                skill,
+                1 if completed else 0,
+            ),
+        )
+
+    connection.commit()
+    connection.close()
+
+
+def load_progress(student_name, career):
+    """Load saved skill progress for a student and career."""
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT skill, completed
+        FROM skill_progress
+        WHERE student_name = ?
+        AND career = ?
+        """,
+        (
+            student_name,
+            career,
+        ),
+    )
+
+    rows = cursor.fetchall()
+
+    connection.close()
+
+    return {
+        skill: bool(completed)
+        for skill, completed in rows
+    }
+
+
+def delete_progress(student_name, career):
+    """Delete saved progress for a student and career."""
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        DELETE FROM skill_progress
+        WHERE student_name = ?
+        AND career = ?
+        """,
+        (
+            student_name,
+            career,
+        ),
+    )
+
+    connection.commit()
+    connection.close()
+
+
+# Initialize database when app starts.
+initialize_database()
+
+# ============================================================
 # CUSTOM CSS
 # ============================================================
 
 st.markdown(
     """
     <style>
+
     .main {
         background-color: #f7f9fc;
     }
@@ -126,13 +255,12 @@ st.markdown(
         background: white;
         border: 1px solid #e5e7eb;
         text-align: center;
-        min-height: 125px;
+        margin-bottom: 15px;
     }
 
     .dashboard-number {
         font-size: 32px;
         font-weight: bold;
-        margin-top: 8px;
     }
 
     .dashboard-label {
@@ -142,9 +270,18 @@ st.markdown(
 
     .dashboard-title {
         font-size: 18px;
-        font-weight: 600;
-        margin-bottom: 8px;
+        font-weight: bold;
+        margin-bottom: 5px;
     }
+
+    .save-box {
+        padding: 18px;
+        border-radius: 14px;
+        background: #f0f9ff;
+        border: 1px solid #bae6fd;
+        margin-bottom: 15px;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -204,6 +341,7 @@ CAREER_SKILLS = {
 # ============================================================
 
 SKILL_RECOMMENDATIONS = {
+
     "Python": {
         "why": (
             "Python is widely used for automation, data analysis, "
@@ -364,6 +502,7 @@ SKILL_RECOMMENDATIONS = {
 # ============================================================
 
 PROJECTS = {
+
     "AI/ML Engineer": [
         "House Price Prediction System",
         "Customer Churn Prediction",
@@ -403,12 +542,15 @@ if "analysis_data" not in st.session_state:
 if "analysis_ready" not in st.session_state:
     st.session_state.analysis_ready = False
 
+if "saved_progress_loaded" not in st.session_state:
+    st.session_state.saved_progress_loaded = False
+
 # ============================================================
 # HELPER FUNCTIONS
 # ============================================================
 
+
 def calculate_match(required_skills, current_skills):
-    """Calculate matching and missing skills."""
 
     current_lower = {
         skill.lower()
@@ -426,17 +568,19 @@ def calculate_match(required_skills, current_skills):
             missing.append(skill)
 
     if required_skills:
+
         percentage = round(
             (len(matching) / len(required_skills)) * 100
         )
+
     else:
+
         percentage = 0
 
     return matching, missing, percentage
 
 
 def choose_priority(missing_skills):
-    """Choose the next skill using a transparent priority order."""
 
     if not missing_skills:
         return "Advanced project development"
@@ -468,7 +612,6 @@ def choose_priority(missing_skills):
 
 
 def generate_roadmap(career, missing_skills):
-    """Generate a progressive learning roadmap."""
 
     if not missing_skills:
 
@@ -567,35 +710,42 @@ def generate_roadmap(career, missing_skills):
     return phases
 
 
-def generate_next_actions(career, missing_skills, matching_skills):
-    """Generate personalized next actions."""
+def generate_next_actions(
+    career,
+    missing_skills,
+    matching_skills,
+):
 
     actions = []
 
     if missing_skills:
 
-        priority = choose_priority(missing_skills)
-
-        actions.append(
-            f"Focus first on {priority}, because it is currently "
-            f"one of the important missing skills for {career}."
+        priority = choose_priority(
+            missing_skills
         )
 
         actions.append(
-            f"Complete one practical exercise related to {priority} "
-            "before moving to the next major skill."
+            f"Focus first on {priority}, because it is "
+            f"currently one of the important missing skills "
+            f"for {career}."
+        )
+
+        actions.append(
+            f"Complete one practical exercise related to "
+            f"{priority} before moving to the next major skill."
         )
 
     if matching_skills:
 
         actions.append(
-            f"Strengthen your existing {matching_skills[0]} knowledge "
-            "by applying it in a project."
+            f"Strengthen your existing "
+            f"{matching_skills[0]} knowledge by applying "
+            "it in a project."
         )
 
     actions.append(
-        "Update your GitHub portfolio after completing each "
-        "meaningful project milestone."
+        "Update your GitHub portfolio after completing "
+        "each meaningful project milestone."
     )
 
     actions.append(
@@ -607,13 +757,13 @@ def generate_next_actions(career, missing_skills, matching_skills):
 
 
 def generate_adaptation_message(progress):
-    """Generate an adaptive message from learning progress."""
 
     if progress < 25:
 
         return (
             "Your current profile has several skill gaps. "
-            "The agent prioritizes foundational skills before advanced topics."
+            "The agent prioritizes foundational skills "
+            "before advanced topics."
         )
 
     if progress < 50:
@@ -646,7 +796,11 @@ def generate_adaptation_message(progress):
     )
 
 
-def generate_analysis(name, career, current_skills):
+def generate_analysis(
+    name,
+    career,
+    current_skills,
+):
 
     required_skills = CAREER_SKILLS[career]
 
@@ -655,7 +809,9 @@ def generate_analysis(name, career, current_skills):
         current_skills,
     )
 
-    priority = choose_priority(missing)
+    priority = choose_priority(
+        missing
+    )
 
     roadmap = generate_roadmap(
         career,
@@ -683,10 +839,10 @@ def generate_analysis(name, career, current_skills):
     if percentage >= 80:
 
         profile_summary = (
-            f"{name}'s profile has strong alignment with the "
-            f"{career} career path. The main focus should now be "
-            "practical application, advanced projects and "
-            "portfolio development."
+            f"{name}'s profile has strong alignment with "
+            f"the {career} career path. The main focus should "
+            "now be practical application, advanced projects "
+            "and portfolio development."
         )
 
     elif percentage >= 50:
@@ -694,8 +850,8 @@ def generate_analysis(name, career, current_skills):
         profile_summary = (
             f"{name}'s profile shows moderate alignment with "
             f"{career}. The agent identified several important "
-            "skills that should be developed before moving toward "
-            "advanced career preparation."
+            "skills that should be developed before moving "
+            "toward advanced career preparation."
         )
 
     else:
@@ -760,16 +916,16 @@ with st.sidebar:
         4. Analyze your skill gaps
         5. Follow the personalized roadmap
         6. Track your progress
-        7. Re-analyze as you improve
+        7. Save your progress
+        8. Reopen the app and continue
         """
     )
 
     st.divider()
 
     st.info(
-        "💡 This prototype uses a local decision engine, "
-        "so it does not require an external AI API "
-        "or paid API credits."
+        "💡 This prototype uses a local decision engine "
+        "and SQLite database. No paid AI API is required."
     )
 
 # ============================================================
@@ -851,17 +1007,53 @@ if st.button(
 
         st.session_state.analysis_ready = True
 
-        # Reset old progress checkboxes for this career
+        # Reset UI progress state.
         for skill in CAREER_SKILLS[career]:
 
             key = f"progress_{skill}_{career}"
 
             if key in st.session_state:
+
                 del st.session_state[key]
 
-        st.success(
-            "✅ Career profile analyzed successfully!"
+        # Load previously saved database progress.
+        saved_progress = load_progress(
+            name.strip(),
+            career,
         )
+
+        for skill in CAREER_SKILLS[career]:
+
+            key = f"progress_{skill}_{career}"
+
+            if skill in saved_progress:
+
+                st.session_state[key] = (
+                    saved_progress[skill]
+                )
+
+            else:
+
+                # New student:
+                # selected current skills start as completed.
+                st.session_state[key] = (
+                    skill in current_skills
+                )
+
+        st.session_state.saved_progress_loaded = True
+
+        if saved_progress:
+
+            st.success(
+                "✅ Career analysis completed and "
+                "previously saved progress was restored!"
+            )
+
+        else:
+
+            st.success(
+                "✅ Career profile analyzed successfully!"
+            )
 
 # ============================================================
 # RESULTS
@@ -896,66 +1088,82 @@ if (
     )
 
     # ========================================================
-    # TOP CAREER METRICS
+    # METRICS
     # ========================================================
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
+
         st.markdown(
             f"""
             <div class="metric-card">
+
                 <div class="metric-value">
                     {data["percentage"]}%
                 </div>
+
                 <div class="metric-label">
                     Career Match
                 </div>
+
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col2:
+
         st.markdown(
             f"""
             <div class="metric-card">
+
                 <div class="metric-value">
                     {len(data["matching"])}
                 </div>
+
                 <div class="metric-label">
                     Matching Skills
                 </div>
+
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col3:
+
         st.markdown(
             f"""
             <div class="metric-card">
+
                 <div class="metric-value">
                     {len(data["missing"])}
                 </div>
+
                 <div class="metric-label">
                     Skill Gaps
                 </div>
+
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col4:
+
         st.markdown(
             f"""
             <div class="metric-card">
+
                 <div class="metric-value">
                     {len(data["required"])}
                 </div>
+
                 <div class="metric-label">
                     Required Skills
                 </div>
+
             </div>
             """,
             unsafe_allow_html=True,
@@ -1192,7 +1400,8 @@ if (
 
     st.caption(
         "Your initially selected skills are marked as completed. "
-        "Use the checkboxes to update your learning progress."
+        "Saved database progress is restored automatically "
+        "when available."
     )
 
     progress_skills = data["required"]
@@ -1201,15 +1410,15 @@ if (
 
     for skill in progress_skills:
 
-        default_value = (
-            skill in data["matching"]
+        key = (
+            f"progress_{skill}_{data['career']}"
         )
-
-        key = f"progress_{skill}_{data['career']}"
 
         if key not in st.session_state:
 
-            st.session_state[key] = default_value
+            st.session_state[key] = (
+                skill in data["matching"]
+            )
 
         completed = st.checkbox(
             skill,
@@ -1217,10 +1426,11 @@ if (
         )
 
         if completed:
+
             completed_count += 1
 
     # ========================================================
-    # REAL LEARNING PROGRESS
+    # CALCULATE PROGRESS
     # ========================================================
 
     progress = (
@@ -1236,7 +1446,10 @@ if (
 
     st.progress(
         progress / 100,
-        text=f"Learning Progress: {progress}%",
+        text=(
+            f"Learning Progress: "
+            f"{progress}%"
+        ),
     )
 
     st.write(
@@ -1246,12 +1459,109 @@ if (
     )
 
     # ========================================================
+    # STEP 6 — SAVE PROGRESS
+    # ========================================================
+
+    st.header("💾 Step 6 — Save Progress")
+
+    st.markdown(
+        """
+        <div class="save-box">
+
+            <strong>Persistent Progress</strong>
+
+            <p>
+                Your completed skills can now be stored in
+                the SQLite database. Close and reopen the app,
+                then analyze the same student profile to
+                restore the saved progress.
+            </p>
+
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    progress_to_save = {}
+
+    for skill in progress_skills:
+
+        key = (
+            f"progress_{skill}_{data['career']}"
+        )
+
+        progress_to_save[skill] = (
+            st.session_state.get(
+                key,
+                False,
+            )
+        )
+
+    save_col1, save_col2 = st.columns(2)
+
+    with save_col1:
+
+        if st.button(
+            "💾 Save My Progress",
+            type="primary",
+            use_container_width=True,
+        ):
+
+            save_progress(
+                student_name=data["name"],
+                career=data["career"],
+                progress_data=progress_to_save,
+            )
+
+            st.success(
+                "✅ Progress saved successfully!"
+            )
+
+            st.info(
+                "You can now close and reopen the app. "
+                "Your saved skill progress will be restored "
+                "when you analyze the same student profile."
+            )
+
+    with save_col2:
+
+        if st.button(
+            "🗑️ Delete Saved Progress",
+            use_container_width=True,
+        ):
+
+            delete_progress(
+                student_name=data["name"],
+                career=data["career"],
+            )
+
+            for skill in progress_skills:
+
+                key = (
+                    f"progress_{skill}_{data['career']}"
+                )
+
+                if key in st.session_state:
+
+                    del st.session_state[key]
+
+            st.success(
+                "✅ Saved progress deleted."
+            )
+
+            st.rerun()
+
+    # ========================================================
     # ADAPTIVE PROGRESS MESSAGE
     # ========================================================
 
-    current_adaptation = generate_adaptation_message(
-        progress
+    current_adaptation = (
+        generate_adaptation_message(
+            progress
+        )
     )
+
+    st.header("🔄 Current Adaptive Status")
 
     if progress >= 80:
 
@@ -1275,22 +1585,9 @@ if (
     # STEP 5 — DASHBOARD
     # ========================================================
 
-    st.divider()
+    st.header("📊 Step 5 — Dashboard")
 
-    st.header("📊 Career Dashboard")
-
-    st.caption(
-        "Live dashboard based on your current career analysis "
-        "and skill completion progress."
-    )
-
-    # --------------------------------------------------------
-    # Dashboard Metrics
-    # --------------------------------------------------------
-
-    dashboard_col1, dashboard_col2, dashboard_col3, dashboard_col4 = (
-        st.columns(4)
-    )
+    dashboard_col1, dashboard_col2 = st.columns(2)
 
     with dashboard_col1:
 
@@ -1298,12 +1595,16 @@ if (
             f"""
             <div class="dashboard-card">
 
-                <div class="dashboard-label">
+                <div class="dashboard-title">
                     Career Match
                 </div>
 
                 <div class="dashboard-number">
                     {data["percentage"]}%
+                </div>
+
+                <div class="dashboard-label">
+                    Initial profile match
                 </div>
 
             </div>
@@ -1317,7 +1618,7 @@ if (
             f"""
             <div class="dashboard-card">
 
-                <div class="dashboard-label">
+                <div class="dashboard-title">
                     Skills Completed
                 </div>
 
@@ -1325,23 +1626,38 @@ if (
                     {completed_count}/{len(progress_skills)}
                 </div>
 
+                <div class="dashboard-label">
+                    Current saved progress
+                </div>
+
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+    dashboard_col3, dashboard_col4 = st.columns(2)
+
     with dashboard_col3:
+
+        remaining_count = (
+            len(progress_skills)
+            - completed_count
+        )
 
         st.markdown(
             f"""
             <div class="dashboard-card">
 
-                <div class="dashboard-label">
+                <div class="dashboard-title">
                     Skills Remaining
                 </div>
 
                 <div class="dashboard-number">
-                    {len(progress_skills) - completed_count}
+                    {remaining_count}
+                </div>
+
+                <div class="dashboard-label">
+                    Skills still to complete
                 </div>
 
             </div>
@@ -1355,7 +1671,7 @@ if (
             f"""
             <div class="dashboard-card">
 
-                <div class="dashboard-label">
+                <div class="dashboard-title">
                     Roadmap Progress
                 </div>
 
@@ -1363,20 +1679,24 @@ if (
                     {progress}%
                 </div>
 
+                <div class="dashboard-label">
+                    Current learning progress
+                </div>
+
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-    # --------------------------------------------------------
-    # Skill Completion Chart
-    # --------------------------------------------------------
+    # ========================================================
+    # DASHBOARD CHART
+    # ========================================================
 
     st.subheader("📈 Skill Completion Overview")
 
     chart_data = {
         "Completed": completed_count,
-        "Remaining": len(progress_skills) - completed_count,
+        "Remaining": remaining_count,
     }
 
     st.bar_chart(
@@ -1384,96 +1704,81 @@ if (
         height=300,
     )
 
-    # --------------------------------------------------------
-    # Roadmap Progress
-    # --------------------------------------------------------
-
-    st.subheader("🗺️ Roadmap Progress")
+    st.subheader("🗺️ Roadmap Completion")
 
     st.progress(
         progress / 100,
-        text=f"Roadmap Progress: {progress}%",
+        text=(
+            f"Roadmap Progress: "
+            f"{progress}%"
+        ),
     )
 
-    if progress == 100:
+    # ========================================================
+    # COMPLETED / REMAINING SKILLS
+    # ========================================================
 
-        st.success(
-            "🎉 All required skills are completed! "
-            "You can now focus on advanced projects, "
-            "specialization and career preparation."
-        )
+    dashboard_skill_col1, dashboard_skill_col2 = st.columns(2)
 
-    elif progress >= 75:
+    with dashboard_skill_col1:
 
-        st.info(
-            "🚀 You are close to completing the roadmap. "
-            "Focus on the remaining skills and portfolio projects."
-        )
+        st.subheader("✅ Completed Skills")
 
-    elif progress >= 50:
+        completed_skills = []
 
-        st.info(
-            "📚 More than half of the required skills are complete. "
-            "Continue with intermediate learning and projects."
-        )
+        for skill in progress_skills:
 
-    else:
+            key = (
+                f"progress_{skill}_{data['career']}"
+            )
 
-        st.warning(
-            "🌱 Keep building your foundation. "
-            "Complete the next prioritized skill to move forward."
-        )
+            if st.session_state.get(
+                key,
+                False,
+            ):
 
-    # --------------------------------------------------------
-    # Dashboard Skill Status
-    # --------------------------------------------------------
+                completed_skills.append(
+                    skill
+                )
 
-    st.subheader("📋 Skill Status")
+        if completed_skills:
 
-    dashboard_status_col1, dashboard_status_col2 = st.columns(2)
+            for skill in completed_skills:
 
-    with dashboard_status_col1:
-
-        st.markdown("### ✅ Completed Skills")
-
-        if data["matching"]:
-
-            for skill in data["required"]:
-
-                key = f"progress_{skill}_{data['career']}"
-
-                if st.session_state.get(key, False):
-
-                    st.success(
-                        f"✓ {skill}"
-                    )
+                st.success(
+                    f"✓ {skill}"
+                )
 
         else:
 
-            st.write("No skills completed yet.")
+            st.write(
+                "No skills completed yet."
+            )
 
-    with dashboard_status_col2:
+    with dashboard_skill_col2:
 
-        st.markdown("### ⏳ Remaining Skills")
+        st.subheader("⏳ Remaining Skills")
 
-        remaining_dashboard_skills = []
+        remaining_skills = []
 
-        for skill in data["required"]:
+        for skill in progress_skills:
 
-            key = f"progress_{skill}_{data['career']}"
+            key = (
+                f"progress_{skill}_{data['career']}"
+            )
 
             if not st.session_state.get(
                 key,
                 False,
             ):
 
-                remaining_dashboard_skills.append(
+                remaining_skills.append(
                     skill
                 )
 
-        if remaining_dashboard_skills:
+        if remaining_skills:
 
-            for skill in remaining_dashboard_skills:
+            for skill in remaining_skills:
 
                 st.warning(
                     f"• {skill}"
@@ -1482,25 +1787,40 @@ if (
         else:
 
             st.success(
-                "No remaining skills."
+                "🎉 All required skills completed!"
             )
 
     # ========================================================
     # RESET PROGRESS
     # ========================================================
 
+    st.divider()
+
     if st.button(
-        "🔄 Reset Skill Progress",
+        "🔄 Reset Current Progress",
         use_container_width=True,
     ):
 
-        for skill in data["required"]:
+        # Delete from database.
+        delete_progress(
+            student_name=data["name"],
+            career=data["career"],
+        )
 
-            key = f"progress_{skill}_{data['career']}"
+        # Delete Streamlit session state.
+        for skill in progress_skills:
+
+            key = (
+                f"progress_{skill}_{data['career']}"
+            )
 
             if key in st.session_state:
 
                 del st.session_state[key]
+
+        st.success(
+            "✅ Progress reset successfully."
+        )
 
         st.rerun()
 
@@ -1592,6 +1912,13 @@ if (
                 change accordingly.
             </p>
 
+            <p>
+                <strong>8. Persistent Storage</strong><br>
+                Skill progress is stored in a SQLite database
+                so the student's progress can be restored
+                when the same profile is opened again.
+            </p>
+
         </div>
         """,
         unsafe_allow_html=True,
@@ -1654,6 +1981,13 @@ if (
             "Updates recommendations when the "
             "student's progress changes.",
         ),
+
+        (
+            "8️⃣",
+            "Persistent Memory",
+            "Stores completed skills in the "
+            "SQLite database for later retrieval.",
+        ),
     ]
 
     for (
@@ -1687,7 +2021,7 @@ if (
 
     st.success(
         "🟢 Career Navigator is running "
-        "in local zero-cost mode."
+        "with local decision engine + SQLite persistence."
     )
 
     st.caption(
@@ -1696,8 +2030,8 @@ if (
     )
 
     st.caption(
-        "Analysis generated locally • "
-        "Real-time profile evaluation"
+        "Student progress is stored in: "
+        "career_navigator.db"
     )
 
 # ============================================================
@@ -1721,7 +2055,8 @@ st.markdown(
         <br>
 
         Agentic AI • Personalized Learning •
-        Skill Gap Analysis • Adaptive Roadmap
+        Skill Gap Analysis • Adaptive Roadmap •
+        Persistent Progress
 
     </div>
     """,
