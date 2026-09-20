@@ -82,3 +82,21 @@ tests/                     pytest suite
 * The knowledge base is hand-curated for the prototype. Course names and providers should be re-checked before real use.
 * Example "market updates" are simulated to demonstrate adaptability; they are not live job-market data.
 * Possible extension: plug an LLM behind `explain_*` for richer coaching, or replace `data.py` with a live skills API.
+
+## System Workflow
+
+User Profile
+↓
+Target Career Selection
+↓
+Current Skill Analysis
+↓
+Skill Gap Identification
+↓
+Personalized Roadmap
+↓
+Learning Recommendations
+↓
+Progress Tracking
+↓
+Adaptive Re-planning
