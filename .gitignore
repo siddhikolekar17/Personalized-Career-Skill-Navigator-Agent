@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Local data and secrets (never commit these)
+career_navigator.db
+*.db
+.streamlit/secrets.toml
+.env
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
