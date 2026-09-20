@@ -82,3 +82,33 @@ tests/                     pytest suite
 * The knowledge base is hand-curated for the prototype. Course names and providers should be re-checked before real use.
 * Example "market updates" are simulated to demonstrate adaptability; they are not live job-market data.
 * Possible extension: plug an LLM behind `explain_*` for richer coaching, or replace `data.py` with a live skills API.
+## Installation and Setup
+
+### Prerequisites
+
+Make sure the following are installed:
+
+- Python 3.10 or later
+- Git
+- A web browser
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/siddhikolekar17/Personalized-Career-Skill-Navigator-Agent.git
+cd Personalized-Career-Skill-Navigator-Agent
+
+
+## Installation and Setup
+
+### Requirements
+
+- Python 3.10 or later
+- Git
+- Streamlit
+
+### Run the Project
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
