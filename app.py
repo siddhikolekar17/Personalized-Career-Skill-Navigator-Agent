@@ -1,4 +1,6 @@
 import os
+import json
+import re
 import streamlit as st
 
 # =========================================================
@@ -166,27 +168,36 @@ if "analysis_data" not in st.session_state:
 if "ai_result" not in st.session_state:
     st.session_state.ai_result = None
 
+
 # =========================================================
-# HELPER: GET API KEY
+# GET OPENAI API KEY
 # =========================================================
 
 def get_openai_api_key():
-    """Get OpenAI API key securely from Streamlit Secrets."""
+    """
+    Get the OpenAI API key securely from Streamlit Secrets.
+    Falls back to environment variable if needed.
+    """
 
     try:
         api_key = st.secrets.get("OPENAI_API_KEY")
 
         if api_key:
-            return api_key
+            return str(api_key).strip()
 
     except Exception:
         pass
 
-    return os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    if api_key:
+        return api_key.strip()
+
+    return None
 
 
 # =========================================================
-# FALLBACK AI RESPONSE
+# FALLBACK RESPONSE
 # =========================================================
 
 def create_fallback_response(
@@ -195,14 +206,16 @@ def create_fallback_response(
     remaining_skills,
     progress_percentage
 ):
-    """Built-in fallback if the AI API is unavailable."""
+    """
+    Built-in recommendation engine.
+    Used when the OpenAI API is unavailable.
+    """
 
     if remaining_skills:
 
         priority = remaining_skills[0]
 
         roadmap_lines = []
-
         projects = []
 
         for index, skill in enumerate(
@@ -250,24 +263,22 @@ def create_fallback_response(
             "projects": projects,
 
             "adaptation": (
-                "The roadmap adapts whenever your progress "
-                "changes. Completed skills are removed from "
-                "the active learning path and the next "
-                "remaining skill becomes the priority."
+                "The roadmap adapts whenever your progress changes. "
+                "Completed skills are removed from the active learning "
+                "path and the next remaining skill becomes the priority."
             ),
 
             "career_advice": (
-                "Complete the priority skill, practice it "
-                "with a small project, publish the project "
-                "to GitHub, and then update your progress."
+                "Complete the priority skill, practice it with a small "
+                "project, publish the project to GitHub, and then "
+                "update your progress."
             )
         }
 
     return {
         "analysis": (
             f"Congratulations {name}! You have completed "
-            f"the currently mapped skills for "
-            f"{target_career}."
+            f"the currently mapped skills for {target_career}."
         ),
 
         "priority": "Advanced Projects",
@@ -286,17 +297,257 @@ def create_fallback_response(
         ],
 
         "adaptation": (
-            "Because the currently required skills are "
-            "completed, the roadmap shifts from basic "
-            "skill acquisition toward advanced projects, "
-            "portfolio development and career preparation."
+            "Because the currently required skills are completed, "
+            "the roadmap shifts from basic skill acquisition toward "
+            "advanced projects, portfolio development and career preparation."
         ),
 
         "career_advice": (
-            "Focus on projects that demonstrate practical "
-            "problem solving and publish your work on GitHub."
+            "Focus on projects that demonstrate practical problem solving "
+            "and publish your work on GitHub."
         )
     }
+
+
+# =========================================================
+# PARSE AI RESPONSE
+# =========================================================
+
+def parse_ai_response(ai_text, fallback):
+    """
+    Convert the AI response into dashboard sections.
+
+    The AI is asked to use clear headings. This parser also
+    handles slightly different heading styles.
+    """
+
+    result = fallback.copy()
+
+    if not ai_text:
+        return result
+
+    clean_text = ai_text.strip()
+
+    # -----------------------------------------------------
+    # Try JSON first
+    # -----------------------------------------------------
+
+    try:
+
+        json_match = re.search(
+            r"\{.*\}",
+            clean_text,
+            re.DOTALL
+        )
+
+        if json_match:
+
+            parsed = json.loads(
+                json_match.group(0)
+            )
+
+            if isinstance(parsed, dict):
+
+                if parsed.get("career_analysis"):
+                    result["analysis"] = parsed["career_analysis"]
+
+                if parsed.get("next_priority"):
+                    result["priority"] = parsed["next_priority"]
+
+                if parsed.get("personalized_roadmap"):
+                    roadmap = parsed["personalized_roadmap"]
+
+                    if isinstance(roadmap, list):
+                        result["roadmap"] = "\n\n".join(
+                            f"{i + 1}. {item}"
+                            for i, item in enumerate(roadmap)
+                        )
+                    else:
+                        result["roadmap"] = str(roadmap)
+
+                if parsed.get("project_recommendations"):
+
+                    projects = parsed["project_recommendations"]
+
+                    if isinstance(projects, list):
+                        result["projects"] = [
+                            str(project)
+                            for project in projects[:5]
+                        ]
+
+                if parsed.get("adaptive_strategy"):
+                    result["adaptation"] = parsed["adaptive_strategy"]
+
+                if parsed.get("career_advice"):
+                    result["career_advice"] = parsed["career_advice"]
+
+                result["raw_ai_text"] = clean_text
+
+                return result
+
+    except Exception:
+        pass
+
+    # -----------------------------------------------------
+    # Heading-based parser
+    # -----------------------------------------------------
+
+    patterns = {
+        "career_analysis": [
+            r"CAREER ANALYSIS",
+            r"CAREER ANALYSIS:",
+            r"### CAREER ANALYSIS"
+        ],
+
+        "next_priority": [
+            r"NEXT PRIORITY",
+            r"NEXT PRIORITY:",
+            r"### NEXT PRIORITY"
+        ],
+
+        "personalized_roadmap": [
+            r"PERSONALIZED ROADMAP",
+            r"PERSONALIZED ROADMAP:",
+            r"### PERSONALIZED ROADMAP"
+        ],
+
+        "project_recommendations": [
+            r"PROJECT RECOMMENDATIONS",
+            r"PROJECT RECOMMENDATIONS:",
+            r"### PROJECT RECOMMENDATIONS"
+        ],
+
+        "adaptive_strategy": [
+            r"ADAPTIVE STRATEGY",
+            r"ADAPTIVE STRATEGY:",
+            r"### ADAPTIVE STRATEGY"
+        ],
+
+        "career_advice": [
+            r"CAREER ADVICE",
+            r"CAREER ADVICE:",
+            r"### CAREER ADVICE"
+        ]
+    }
+
+    sections = {}
+
+    # Create one combined regex
+    all_headings = []
+
+    for key, heading_list in patterns.items():
+
+        for heading in heading_list:
+
+            all_headings.append(
+                (key, heading)
+            )
+
+    # Find headings in text
+    found = []
+
+    for key, heading in all_headings:
+
+        match = re.search(
+            re.escape(heading),
+            clean_text,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            found.append(
+                (
+                    match.start(),
+                    match.end(),
+                    key
+                )
+            )
+
+    found.sort(
+        key=lambda item: item[0]
+    )
+
+    if found:
+
+        for index, item in enumerate(found):
+
+            start_position = item[1]
+
+            if index + 1 < len(found):
+
+                end_position = found[index + 1][0]
+
+            else:
+
+                end_position = len(clean_text)
+
+            section_text = clean_text[
+                start_position:end_position
+            ].strip()
+
+            section_text = section_text.strip(
+                ":#-* \n"
+            )
+
+            sections[item[2]] = section_text
+
+    # -----------------------------------------------------
+    # Apply parsed sections
+    # -----------------------------------------------------
+
+    if sections.get("career_analysis"):
+        result["analysis"] = sections["career_analysis"]
+
+    if sections.get("next_priority"):
+
+        priority_text = sections["next_priority"]
+
+        # Keep it concise
+        priority_text = priority_text.split("\n")[0].strip()
+
+        result["priority"] = priority_text
+
+    if sections.get("personalized_roadmap"):
+        result["roadmap"] = sections["personalized_roadmap"]
+
+    if sections.get("project_recommendations"):
+
+        project_text = sections[
+            "project_recommendations"
+        ]
+
+        project_lines = []
+
+        for line in project_text.splitlines():
+
+            line = line.strip()
+
+            line = re.sub(
+                r"^[\-\*\d\.\)\s]+",
+                "",
+                line
+            )
+
+            if line:
+                project_lines.append(line)
+
+        result["projects"] = project_lines[:5]
+
+    if sections.get("adaptive_strategy"):
+        result["adaptation"] = sections["adaptive_strategy"]
+
+    if sections.get("career_advice"):
+        result["career_advice"] = sections["career_advice"]
+
+    # If no headings were recognized, show complete AI answer
+    if not sections:
+
+        result["analysis"] = clean_text
+
+    result["raw_ai_text"] = clean_text
+
+    return result
 
 
 # =========================================================
@@ -314,7 +565,9 @@ def generate_ai_personalization(
     remaining_skills,
     progress_percentage
 ):
-    """Generate personalized career guidance using OpenAI."""
+    """
+    Generate personalized career guidance using OpenAI.
+    """
 
     fallback = create_fallback_response(
         name,
@@ -325,14 +578,27 @@ def generate_ai_personalization(
 
     api_key = get_openai_api_key()
 
+    # -----------------------------------------------------
+    # API KEY CHECK
+    # -----------------------------------------------------
+
     if not api_key:
 
+        fallback["error"] = (
+            "OpenAI API key was not found in Streamlit Secrets. "
+            "Please check the secret name: OPENAI_API_KEY"
+        )
+
         fallback["analysis"] += (
-            "\n\nAI API key was not detected. "
-            "The built-in recommendation engine is being used."
+            "\n\n⚠️ The OpenAI API key was not detected. "
+            "The built-in career recommendation engine is being used."
         )
 
         return fallback
+
+    # -----------------------------------------------------
+    # OPENAI REQUEST
+    # -----------------------------------------------------
 
     try:
 
@@ -372,34 +638,39 @@ CURRENT PROGRESS
 
 TASK
 
-Analyze the student's current position and create a practical
-career plan.
+Analyze the student's current position.
 
-Return these sections:
+Create a practical and personalized roadmap.
+
+IMPORTANT:
+- Use only the information provided about the student.
+- Do not invent job offers, salaries, statistics, companies,
+  certificates or guaranteed career outcomes.
+- Keep recommendations realistic for a college student.
+- Prioritize the remaining skills.
+- Adapt recommendations based on completed skills.
+- Keep the answer concise.
+
+Return EXACTLY these sections:
 
 CAREER ANALYSIS
-Explain the student's current position.
+A short explanation of the student's current position.
 
 NEXT PRIORITY
-Identify the most useful remaining skill.
+One specific skill or next step.
 
 PERSONALIZED ROADMAP
-Give a logical learning sequence.
+A numbered learning sequence. Include what to learn,
+how to practice, and a small project where useful.
 
 PROJECT RECOMMENDATIONS
-Suggest practical student-level projects.
+Give 3 practical student-level projects.
 
 ADAPTIVE STRATEGY
-Explain how the roadmap should change when the student
-completes skills.
+Explain how the roadmap changes when skills are completed.
 
 CAREER ADVICE
-Give practical next actions.
-
-Keep the answer concise and suitable for a student dashboard.
-
-Do not invent statistics, certificates, companies, job offers,
-or guaranteed career outcomes.
+Give practical next actions for the student.
 """
 
         response = client.responses.create(
@@ -407,37 +678,50 @@ or guaranteed career outcomes.
             input=prompt
         )
 
-        ai_text = response.output_text
+        ai_text = getattr(
+            response,
+            "output_text",
+            ""
+        )
 
         if not ai_text:
+
+            fallback["error"] = (
+                "The OpenAI API returned an empty response."
+            )
+
             return fallback
 
-        return {
-            "analysis": ai_text,
+        result = parse_ai_response(
+            ai_text,
+            fallback
+        )
 
-            "priority": (
-                remaining_skills[0]
-                if remaining_skills
-                else "Advanced Projects"
-            ),
+        result["ai_success"] = True
 
-            "roadmap": "",
+        return result
 
-            "projects": [],
-
-            "adaptation": (
-                "The AI agent generated this guidance using "
-                "the student's profile, target career, "
-                "skill gaps and progress."
-            ),
-
-            "career_advice": (
-                "Continue updating your skill progress so "
-                "the agent can adapt future recommendations."
-            )
-        }
+    # -----------------------------------------------------
+    # SAFE ERROR HANDLING
+    # -----------------------------------------------------
 
     except Exception as e:
+
+        error_type = type(e).__name__
+        error_message = str(e)
+
+        # Do not expose the API key.
+        safe_error = (
+            f"{error_type}: {error_message}"
+        )
+
+        if api_key in safe_error:
+            safe_error = safe_error.replace(
+                api_key,
+                "[API KEY HIDDEN]"
+            )
+
+        fallback["error"] = safe_error[:1000]
 
         fallback["analysis"] += (
             "\n\n⚠️ The AI service could not be reached, "
@@ -445,8 +729,7 @@ or guaranteed career outcomes.
             "is being used."
         )
 
-        # Store only a safe diagnostic message.
-        fallback["error"] = str(e)[:300]
+        fallback["ai_success"] = False
 
         return fallback
 
@@ -502,13 +785,13 @@ if st.button(
     use_container_width=True
 ):
 
-    if not name:
+    if not name.strip():
 
         st.warning(
             "Please enter your name."
         )
 
-    elif not skills_input:
+    elif not skills_input.strip():
 
         st.warning(
             "Please enter your current skills."
@@ -525,46 +808,58 @@ if st.button(
         required_skills = CAREER_SKILLS[career]
 
         matched_skills = []
-
         missing_skills = []
 
         for skill in required_skills:
 
             if skill.lower() in user_skills:
+
                 matched_skills.append(skill)
+
             else:
+
                 missing_skills.append(skill)
 
-        total_required = len(required_skills)
+        total_required = len(
+            required_skills
+        )
 
         match_percentage = (
             len(matched_skills)
             / total_required
         ) * 100
 
-        # Reset progress when starting a new analysis.
+        # Reset old progress
         for skill in required_skills:
+
             key = f"progress_{career}_{skill}"
 
             if key in st.session_state:
+
                 del st.session_state[key]
 
-        # Save analysis in session state.
+        # Save analysis
         st.session_state.analysis_data = {
-            "name": name,
-            "education": education,
-            "skills_input": skills_input,
+
+            "name": name.strip(),
+
+            "education": education.strip(),
+
+            "skills_input": skills_input.strip(),
+
             "career": career,
+
             "required_skills": required_skills,
+
             "matched_skills": matched_skills,
+
             "missing_skills": missing_skills,
+
             "match_percentage": match_percentage
         }
 
-        # Clear previous AI result.
+        # Clear old AI result
         st.session_state.ai_result = None
-
-        st.rerun()
 
 
 # =========================================================
@@ -576,13 +871,19 @@ data = st.session_state.analysis_data
 if data is not None:
 
     name = data["name"]
+
     education = data["education"]
+
     skills_input = data["skills_input"]
+
     career = data["career"]
 
     required_skills = data["required_skills"]
+
     matched_skills = data["matched_skills"]
+
     missing_skills = data["missing_skills"]
+
     match_percentage = data["match_percentage"]
 
 
@@ -598,10 +899,21 @@ if data is not None:
         f"Hello {name}! Your target career is **{career}**."
     )
 
-    st.metric(
-        "Career Skill Match",
-        f"{match_percentage:.0f}%"
-    )
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.metric(
+            "Career Skill Match",
+            f"{match_percentage:.0f}%"
+        )
+
+    with col2:
+
+        st.metric(
+            "Skills Matched",
+            f"{len(matched_skills)} / {len(required_skills)}"
+        )
 
 
     # =====================================================
@@ -765,8 +1077,11 @@ if data is not None:
     # =====================================================
 
     remaining_skills = [
+
         skill
+
         for skill in required_skills
+
         if skill not in completed_skills
     ]
 
@@ -915,19 +1230,26 @@ if data is not None:
 
             st.session_state.ai_result = (
                 generate_ai_personalization(
+
                     name=name,
+
                     education=education,
+
                     current_skills=skills_input,
+
                     target_career=career,
+
                     matched_skills=matched_skills,
+
                     missing_skills=missing_skills,
+
                     completed_skills=completed_skills,
+
                     remaining_skills=remaining_skills,
+
                     progress_percentage=progress_percentage
                 )
             )
-
-        st.rerun()
 
 
     # =====================================================
@@ -951,7 +1273,10 @@ if data is not None:
         )
 
         st.write(
-            ai_result["analysis"]
+            ai_result.get(
+                "analysis",
+                "No AI analysis available."
+            )
         )
 
 
@@ -965,7 +1290,7 @@ if data is not None:
 
         st.info(
             f"Focus next on: "
-            f"**{ai_result['priority']}**"
+            f"**{ai_result.get('priority', 'Next Skill')}**"
         )
 
 
@@ -1010,7 +1335,10 @@ if data is not None:
         )
 
         st.write(
-            ai_result["adaptation"]
+            ai_result.get(
+                "adaptation",
+                "The roadmap adapts based on completed skills."
+            )
         )
 
 
@@ -1040,23 +1368,27 @@ if data is not None:
         )
 
         pipeline = [
+
             "👤 Student Profile",
+
             "🎯 Career Goal",
+
             "📊 Skill Gap Analysis",
+
             "📈 Progress Tracking",
+
             "🤖 AI Career Agent",
+
             "🗺️ Personalized Roadmap",
+
             "📚 Recommendations",
+
             "🔄 Adaptive Roadmap"
         ]
 
-        for index, step in enumerate(
-            pipeline
-        ):
+        for index, step in enumerate(pipeline):
 
-            st.write(
-                step
-            )
+            st.write(step)
 
             if index < len(pipeline) - 1:
 
@@ -1064,13 +1396,19 @@ if data is not None:
 
 
         # -------------------------------------------------
-        # SAFE AI ERROR INFORMATION
+        # AI ERROR INFORMATION
         # -------------------------------------------------
 
         if ai_result.get("error"):
 
+            st.warning(
+                "⚠️ The AI service could not be reached. "
+                "The built-in career recommendation engine "
+                "is being used so the prototype remains functional."
+            )
+
             with st.expander(
-                "Technical information"
+                "🔧 Technical information"
             ):
 
                 st.code(
