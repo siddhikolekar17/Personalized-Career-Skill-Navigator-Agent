@@ -279,39 +279,65 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
                 st.write(f"⬜ **{skill}** — Not Completed")
 
         # -------------------------------------------------
-        # ADAPTIVE ROADMAP
-        # -------------------------------------------------
+# ADAPTIVE ROADMAP
+# -------------------------------------------------
 
-        st.subheader("🗺️ Adaptive Learning Roadmap")
+st.subheader("🗺️ Adaptive Learning Roadmap")
 
-        remaining_skills = [
-            skill
-            for skill in required_skills
-            if skill not in completed_skills
-        ]
+# Skills that are still incomplete
+remaining_skills = [
+    skill
+    for skill in required_skills
+    if skill not in completed_skills
+]
 
-        if remaining_skills:
+if remaining_skills:
+
+    # The first incomplete skill becomes the next priority
+    next_skill = remaining_skills[0]
+
+    st.info(
+        f"🤖 **Agent Recommendation:** "
+        f"Your next priority should be **{next_skill}**."
+    )
+
+    st.write(
+        "The roadmap automatically adapts based on your "
+        "completed skills."
+    )
+
+    st.divider()
+
+    # Show adaptive roadmap
+    for index, skill in enumerate(
+        remaining_skills,
+        start=1
+    ):
+
+        if index == 1:
 
             st.write(
-                "Based on your current progress, your next learning "
-                "priorities are:"
+                f"🔥 **NEXT:** {skill}"
             )
-
-            for index, skill in enumerate(
-                remaining_skills,
-                start=1
-            ):
-
-                st.write(
-                    f"**Step {index}:** Learn and practice **{skill}**"
-                )
 
         else:
 
-            st.success(
-                "🎉 You have completed all required skills!"
+            st.write(
+                f"➡️ **Step {index}:** {skill}"
             )
 
+else:
+
+    st.success(
+    f"🎯 Because you completed previous skills, "
+    f"the agent has updated your roadmap. "
+    f"Your next recommended skill is **{next_skill}**."
+)
+
+    st.write(
+        "Your next step is to build advanced projects "
+        "and prepare for industry roles."
+    )
         # -------------------------------------------------
         # RECOMMENDED NEXT ACTIONS
         # -------------------------------------------------
