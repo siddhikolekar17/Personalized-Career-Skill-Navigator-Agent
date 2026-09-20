@@ -89,7 +89,7 @@ education = st.text_input(
 
 skills_input = st.text_area(
     "Current Skills",
-    placeholder="Example: Python, SQL, HTML, CSS"
+    placeholder="Example: Python, SQL, HTML"
 )
 
 career = st.selectbox(
@@ -111,21 +111,18 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
 
     else:
 
-        # Convert user's skills into a clean list
+        # -------------------------------------------------
+        # CONVERT USER SKILLS
+        # -------------------------------------------------
+
         user_skills = [
             skill.strip().lower()
             for skill in skills_input.split(",")
             if skill.strip()
         ]
 
-        # Get required skills for selected career
+        # Required skills for selected career
         required_skills = CAREER_SKILLS[career]
-
-        # Convert required skills to lowercase for comparison
-        required_lower = [
-            skill.lower()
-            for skill in required_skills
-        ]
 
         # -------------------------------------------------
         # SKILL GAP ANALYSIS
@@ -141,15 +138,15 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
             else:
                 missing_skills.append(skill)
 
-        # Calculate skill match percentage
+        # -------------------------------------------------
+        # CAREER MATCH
+        # -------------------------------------------------
+
         total_required = len(required_skills)
 
-        if total_required > 0:
-            match_percentage = (
-                len(matched_skills) / total_required
-            ) * 100
-        else:
-            match_percentage = 0
+        match_percentage = (
+            len(matched_skills) / total_required
+        ) * 100
 
         # -------------------------------------------------
         # RESULTS
@@ -163,14 +160,13 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
             f"Hello {name}! Your target career is **{career}**."
         )
 
-        # Match percentage
         st.metric(
             "Career Skill Match",
             f"{match_percentage:.0f}%"
         )
 
         # -------------------------------------------------
-        # STRONG SKILLS
+        # MATCHING SKILLS
         # -------------------------------------------------
 
         st.subheader("✅ Your Matching Skills")
@@ -195,6 +191,7 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
                 st.write(f"❌ {skill}")
 
         else:
+
             st.success(
                 "Excellent! You have all the required skills."
             )
@@ -209,15 +206,99 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
             st.write(f"• {skill}")
 
         # -------------------------------------------------
-        # PERSONALIZED ROADMAP
+        # PROGRESS TRACKING
         # -------------------------------------------------
 
-        st.subheader("🗺️ Personalized Learning Roadmap")
+        st.divider()
 
-        if missing_skills:
+        st.header("📈 Skill Progress Tracking")
+
+        st.write(
+            "Mark the skills you have completed to update your "
+            "personalized career progress."
+        )
+
+        completed_skills = []
+
+        # Create checkbox for every required skill
+        for skill in required_skills:
+
+            # Already matching skills are automatically completed
+            default_value = skill in matched_skills
+
+            completed = st.checkbox(
+                skill,
+                value=default_value,
+                key=f"progress_{skill}"
+            )
+
+            if completed:
+                completed_skills.append(skill)
+
+        # -------------------------------------------------
+        # CALCULATE OVERALL PROGRESS
+        # -------------------------------------------------
+
+        completed_count = len(completed_skills)
+
+        total_skills = len(required_skills)
+
+        progress_percentage = (
+            completed_count / total_skills
+        ) * 100
+
+        st.subheader("🎯 Overall Career Progress")
+
+        st.progress(
+            progress_percentage / 100
+        )
+
+        st.metric(
+            "Overall Progress",
+            f"{progress_percentage:.0f}%"
+        )
+
+        st.write(
+            f"**{completed_count} / {total_skills} skills completed**"
+        )
+
+        # -------------------------------------------------
+        # CURRENT STATUS
+        # -------------------------------------------------
+
+        st.subheader("📋 Skill Status")
+
+        for skill in required_skills:
+
+            if skill in completed_skills:
+
+                st.write(f"✅ **{skill}** — Completed")
+
+            else:
+
+                st.write(f"⬜ **{skill}** — Not Completed")
+
+        # -------------------------------------------------
+        # ADAPTIVE ROADMAP
+        # -------------------------------------------------
+
+        st.subheader("🗺️ Adaptive Learning Roadmap")
+
+        remaining_skills = [
+            skill
+            for skill in required_skills
+            if skill not in completed_skills
+        ]
+
+        if remaining_skills:
+
+            st.write(
+                "Based on your current progress, your next learning "
+                "priorities are:"
+            )
 
             for index, skill in enumerate(
-                missing_skills,
+                remaining_skills,
                 start=1
             ):
 
@@ -228,30 +309,56 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
         else:
 
             st.success(
-                "You are ready to move toward advanced projects "
-                "and industry preparation."
+                "🎉 You have completed all required skills!"
             )
 
         # -------------------------------------------------
-        # RECOMMENDATIONS
+        # RECOMMENDED NEXT ACTIONS
         # -------------------------------------------------
 
         st.subheader("💡 Recommended Next Actions")
 
-        if missing_skills:
+        if remaining_skills:
 
-            st.write("📚 Learn the missing skills.")
-            st.write("💻 Build projects using those skills.")
-            st.write("📂 Add completed projects to GitHub.")
-            st.write("🧪 Practice through practical assessments.")
-            st.write("📈 Update your profile as you improve.")
+            next_skill = remaining_skills[0]
+
+            st.write(
+                f"🎯 **Priority:** Start with **{next_skill}**"
+            )
+
+            st.write(
+                "📚 Learn the recommended skill."
+            )
+
+            st.write(
+                "💻 Build a practical project."
+            )
+
+            st.write(
+                "📂 Add the project to GitHub."
+            )
+
+            st.write(
+                "🧪 Practice with real-world problems."
+            )
+
+            st.write(
+                "📈 Update your progress after completing the skill."
+            )
 
         else:
 
-            st.write("💻 Build advanced real-world projects.")
-            st.write("📂 Strengthen your GitHub portfolio.")
-            st.write("🏆 Consider relevant certifications.")
-            st.write("🎯 Prepare for industry roles.")
+            st.write(
+                "💻 Build advanced real-world projects."
+            )
+
+            st.write(
+                "📂 Strengthen your GitHub portfolio."
+            )
+
+            st.write(
+                "🏆 Consider relevant certifications."
+            )
 
         # -------------------------------------------------
         # EXPLANATION
@@ -259,9 +366,20 @@ if st.button("🚀 Analyze My Career", use_container_width=True):
 
         st.subheader("💡 Why these recommendations?")
 
-        st.write(
-            f"The roadmap is based on the skills required for "
-            f"**{career}** and the skills you entered in your "
-            f"current profile. Missing skills are prioritized "
-            f"as learning areas."
-        )
+        if remaining_skills:
+
+            next_skill = remaining_skills[0]
+
+            st.write(
+                f"Your roadmap adapts to your completed skills. "
+                f"Since **{next_skill}** is still incomplete, "
+                f"it is currently prioritized as your next learning goal."
+            )
+
+        else:
+
+            st.write(
+                f"You have completed the required skills for "
+                f"**{career}**. The system therefore recommends "
+                f"advanced projects and career preparation."
+            )
